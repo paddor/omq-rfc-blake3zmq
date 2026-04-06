@@ -569,3 +569,5 @@ PROTOCOL_ID     = "BLAKE3ZMQ-1.0"
 - [X25519 (RFC 7748)](https://tools.ietf.org/html/rfc7748) -- Diffie-Hellman
 - [BLAKE3](https://github.com/BLAKE3-team/BLAKE3) -- hash function and KDF
 - [The Noise Protocol Framework](https://noiseprotocol.org/noise.html) -- inspiration for transcript hash pattern
+- [ChaCha20-BLAKE3 AEAD](https://github.com/skerkour/chacha20-blake3) -- AEAD construction combining ChaCha20 and BLAKE3
+- [ChaCha20-BLAKE3: Secure, Simple and Fast](https://kerkour.com/chacha20-blake3) -- design rationale for ChaCha20-BLAKE3

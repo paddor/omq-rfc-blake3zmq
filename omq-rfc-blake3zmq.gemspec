@@ -17,7 +17,8 @@ Gem::Specification.new do |s|
 
   s.files = Dir["lib/**/*.rb", "README.md", "LICENSE"]
 
-  s.add_dependency "protocol-zmtp", ">= 0.2"
-  s.add_dependency "chacha20blake3", ">= 0.1"
+  s.add_dependency "protocol-zmtp", ">= 0.3"
+  s.add_dependency "blake3-rb", ">= 1.8"
+  s.add_dependency "chacha20blake3", ">= 0.2"
   s.add_dependency "x25519", ">= 1.0"
 end

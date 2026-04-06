@@ -3,6 +3,7 @@
 require_relative "test_helper"
 
 require "nuckle"
+require "digest/blake3"
 
 # Custom crypto backend using Nuckle (pure-Ruby X25519) for key exchange
 # and chacha20blake3 for AEAD/hash. Demonstrates backend pluggability.
@@ -45,7 +46,7 @@ module NuckleCrypto
     module_function
 
     def digest(input)
-      ChaCha20Blake3.digest(input)
+      Digest::Blake3.digest(input)
     end
 
     def derive_key(context, material, size: 32)

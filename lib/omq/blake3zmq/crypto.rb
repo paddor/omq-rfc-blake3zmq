@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "chacha20blake3"
+require "digest/blake3"
 require "x25519"
 require "securerandom"
 
@@ -80,7 +81,7 @@ module OMQ
         # @param input [String] data to hash
         # @return [String] 32-byte binary digest
         def digest(input)
-          ChaCha20Blake3.digest(input)
+          Digest::Blake3.digest(input)
         end
 
 

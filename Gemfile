@@ -13,3 +13,4 @@ gem "minitest"
 gem "rake"
 gem "async"
 gem "io-stream"
+gem "omq", path: ENV["OMQ_DEV"] ? "../omq" : nil

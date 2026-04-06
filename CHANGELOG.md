@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-04-07
 
 - Replace `[Async {}].each(&:wait)` with `Barrier` in tests.
 - YARD documentation on all public methods and classes.
 - Code style: expand `else X` one-liners, two blank lines between methods
   and constants.
+- Add socket-level integration tests (PUSH/PULL, REQ/REP, PUB/SUB,
+  XPUB/XSUB, multipart messages, multiple clients).
 
 - **Breaking:** API is now kwargs-only:
   `Blake3.server(public_key:, secret_key:)` and

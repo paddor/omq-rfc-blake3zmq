@@ -1,0 +1,90 @@
+Questions for cryptography review of BLAKE3ZMQ (RFC.md)
+========================================================
+
+Anti-amplification
+* The margin is only 8 bytes (HELLO 200B vs WELCOME 192B). Is that
+  sufficient, or should HELLO be padded further?
+
+ChaCha20-BLAKE3 AEAD
+* This is a non-standard AEAD construction (not in IETF or NIST
+  registries). ChaCha20 for encryption, BLAKE3 for authentication.
+  Are there known concerns with using BLAKE3 as a MAC in an
+  encrypt-then-MAC AEAD, vs. Poly1305?
+
+32-byte tag
+* BLAKE3's tag is 32 bytes vs Poly1305's 16 bytes. The extra 16 bytes
+  per message are the main overhead difference. Is 32 bytes of
+  authentication tag justified, or would truncating to 16 bytes
+  (matching Poly1305) be safe with BLAKE3?
+
+Transcript hash construction
+* h_i = H(h_{i-1} || wire_bytes). This is plain iterative BLAKE3
+  hashing, not HMAC or a dedicated MAC. Is concatenation-then-hash
+  sufficient here, or is there a length-extension or collision concern?
+  (BLAKE3 is not susceptible to length-extension, but want to confirm
+  this usage is sound.)
+
+KDF separation
+* All keys/nonces are derived via BLAKE3-derive-key with distinct
+  context strings (e.g. "BLAKE3ZMQ-1.0 HELLO key" vs
+  "BLAKE3ZMQ-1.0 HELLO nonce"). Is context-string domain separation
+  in BLAKE3-derive-key sufficient to guarantee independence, or should
+  additional structural separation (e.g. different input orderings)
+  be used?
+
+Nonce derivation — counter_base wrapping
+* Session nonce = prefix(16) || LE64(wrapping_add(counter_base, i)).
+  counter_base is pseudorandom (from KDF), so the nonce suffix cycles
+  through all 2^64 values starting at counter_base. The u64 wrapping
+  is expected to occur in practice (e.g. counter_base near 2^64), but
+  every value is visited exactly once before any repeat, so uniqueness
+  holds for all 2^64 messages. Is this pseudorandom-base + counter
+  design preferable to the simpler alternative of base = 0 with all
+  entropy in the 16-byte prefix?
+
+hello_box encrypts 64 zero bytes
+* The RFC notes this follows CurveZMQ convention. The AEAD tag alone
+  is sufficient to prove correct decryption. Is there any
+  cryptographic reason to keep the 64 zero bytes, or can they be
+  removed in a future revision to shrink HELLO?
+
+No re-keying
+* The protocol explicitly does not re-key within a connection
+  (Section 3). For very long-lived connections (days/weeks), is 2^64
+  messages under a single key acceptable for ChaCha20-BLAKE3? Are
+  there reasons to add periodic re-keying even if the counter space
+  is not exhausted?
+
+Cookie key as KDF input, not direct encryption key
+* cookie_key = KDF("BLAKE3ZMQ-1.0 cookie", K). The raw cookie key K
+  is never used directly — it's passed through KDF first. Is this
+  extra KDF step necessary or just defense in depth?
+
+welcome_key reuses dh1
+* Both hello_key and welcome_key are derived from the same DH output
+  dh1, differentiated only by KDF context string. Is this safe, or
+  should welcome_key use additional input (e.g. h1) in the IKM as
+  well? (welcome_nonce already uses h1.)
+
+Vouch binds C' and S but not h2
+* vouch_box = Encrypt(vouch_key, vouch_nonce, C' || S). The vouch
+  proves the client owns c and binds the ephemeral key to the server
+  identity. Should the transcript hash h2 also be included in the
+  vouch plaintext to bind the vouch to the specific session state at
+  that point?
+
+Data phase AAD is just the flags byte
+* Data frames use the 1-byte ZMTP flags as AAD. For draft sockets
+  this is always 0x00. Is a single zero byte of AAD meaningful, or
+  should additional context (e.g. a direction indicator or message
+  counter) be included?
+
+No explicit key confirmation message
+* After READY, the first data message serves as implicit key
+  confirmation. Is this sufficient, or should there be an explicit
+  confirmation step (like TLS 1.3 Finished)?
+
+Mapping to Noise
+* The handshake resembles Noise IK (or IKpsk) with a cookie
+  extension. Has this pattern been formally analyzed? Can BLAKE3ZMQ
+  be expressed as a Noise pattern to leverage existing proofs?

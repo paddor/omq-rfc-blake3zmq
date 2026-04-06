@@ -66,7 +66,7 @@ SIMD acceleration (x86-64: AVX2/AVX-512; ARM: NEON/SVE).
 | Key              | Lifetime     | Size     | Purpose                        |
 |------------------|--------------|----------|--------------------------------|
 | Server permanent | Long-lived   | 32 bytes | Server identity                |
-| Client permanent | Long-lived   | 32 bytes | Client identity (mutual auth)  |
+| Client permanent | Long-lived or ephemeral | 32 bytes | Client identity       |
 | Client ephemeral | One connection | 32 bytes | Forward secrecy              |
 | Server ephemeral | One connection | 32 bytes | Forward secrecy              |
 | Cookie key       | ~60 seconds  | 32 bytes | Stateless server trick         |
@@ -186,7 +186,12 @@ Cookie size: 24 + 64 + 32(tag) = 120 bytes.
 
 The cookie nonce MUST be random because `K` is shared across connections.
 After creating the cookie, the server MAY discard `s'` and all connection
-state. The cookie key `K` SHOULD be rotated every 60 seconds.
+state. The cookie key `K` MUST be rotated at least every 60 seconds.
+Implementations MUST NOT reuse a cookie key indefinitely. The rotation
+interval SHOULD NOT be shorter than the maximum expected HELLO-to-INITIATE
+round-trip time; otherwise clients on high-latency links will see
+persistent handshake failures as their cookies are invalidated before
+they can be returned.
 
 **Welcome box:**
 
@@ -227,7 +232,7 @@ dh2 = X25519(c', S')    # ephemeral-ephemeral (forward secrecy)
 dh3 = X25519(c, S')     # client-permanent x server-ephemeral (vouch)
 ```
 
-**Vouch (mutual authentication mode only):**
+**Vouch:**
 
 The vouch proves the client owns `C` and binds its identity to this session.
 
@@ -243,25 +248,16 @@ The vouch is unforgeable (requires `c`), unreplayable (bound to `S'`
 which is ephemeral), and binds the client's ephemeral key `C'` to its
 permanent identity `C`.
 
+Clients without pre-existing permanent keys MUST generate an ephemeral
+permanent keypair for the connection. The wire format is always identical.
+
 **Initiate box:**
 
 ```
-initiate_key   = KDF("BLAKE3ZMQ-1.0 INITIATE key", dh2 || h2)
-initiate_nonce = KDF24("BLAKE3ZMQ-1.0 INITIATE nonce", dh2 || h2)
-```
-
-In mutual authentication mode:
-
-```
+initiate_key       = KDF("BLAKE3ZMQ-1.0 INITIATE key", dh2 || h2)
+initiate_nonce     = KDF24("BLAKE3ZMQ-1.0 INITIATE nonce", dh2 || h2)
 initiate_plaintext = C || vouch_box || metadata
-initiate_box = Encrypt(initiate_key, initiate_nonce, initiate_plaintext, aad = "INITIATE")
-```
-
-In server-only mode (anonymous client):
-
-```
-initiate_plaintext = metadata
-initiate_box = Encrypt(initiate_key, initiate_nonce, initiate_plaintext, aad = "INITIATE")
+initiate_box       = Encrypt(initiate_key, initiate_nonce, initiate_plaintext, aad = "INITIATE")
 ```
 
 **Wire format (ZMTP command frame):**
@@ -274,8 +270,7 @@ initiate_box = Encrypt(initiate_key, initiate_nonce, initiate_plaintext, aad = "
 +---------------+---------------+------------------+
 ```
 
-Mutual auth initiate box: 32(C) + 96(vouch) + metadata + 32(tag) = 160 + metadata bytes.
-Server-only initiate box: metadata + 32(tag) bytes.
+Initiate box: 32(C) + 96(vouch) + metadata + 32(tag) = 160 + metadata bytes.
 
 **Server processing:**
 
@@ -283,8 +278,9 @@ Server-only initiate box: metadata + 32(tag) bytes.
 2. Compute `dh2 = X25519(s', C')`. Abort if `dh2` is all zeros.
 3. Derive `initiate_key` and `initiate_nonce`.
 4. Decrypt `initiate_box`.
-5. In mutual auth mode: compute `dh3 = X25519(s', C)`. Abort if `dh3` is all zeros. Verify vouch.
-6. Update transcript: `h3 = H(h2 || INITIATE_wire_bytes)`.
+5. Compute `dh3 = X25519(s', C)`. Abort if `dh3` is all zeros. Verify vouch.
+6. If an authenticator is configured, check `C` against authorized keys. The server MAY reject unknown clients with an ERROR command.
+7. Update transcript: `h3 = H(h2 || INITIATE_wire_bytes)`.
 
 ### 9.4 READY (Server -> Client)
 
@@ -449,24 +445,28 @@ BLAKE3ZMQ has 9 bytes less overhead per message despite a larger tag.
 
 ## 12. Authentication Modes
 
-The authentication mode is determined by server configuration, not
-negotiated on the wire. The server MUST know whether to expect client
-credentials in the INITIATE box.
+The INITIATE box always contains `C || vouch_box || metadata`. The wire
+format is identical regardless of authentication mode. The authentication
+mode is determined by server configuration (whether an authenticator is
+present), not negotiated on the wire.
 
-### 12.1 Server Mode (Anonymous Client)
+The server MUST always verify the vouch cryptographically.
 
-The server has a permanent keypair `(S, s)`. Clients are anonymous -- they
-do not possess permanent keys. The INITIATE box contains only metadata
-(no `C`, no vouch).
+### 12.1 Server-Only Mode
+
+The server has a permanent keypair `(S, s)`. Clients without pre-existing
+permanent keys generate an ephemeral permanent keypair for the connection.
+The server verifies the vouch but does not check `C` against an allowlist.
 
 The server authenticates to the client (the client verified `S` via the
-HELLO box), but the client is not authenticated to the server.
+HELLO box). The client's identity is ephemeral and not meaningful for
+authorization.
 
-### 12.2 Server+Client Mode (Mutual Authentication)
+### 12.2 Mutual Authentication
 
-Both peers have permanent keypairs. The client's permanent public key `C`
-and vouch are sent inside the INITIATE box, encrypted under the ephemeral
-session keys.
+Both peers have long-lived permanent keypairs. The client's permanent
+public key `C` and vouch are sent inside the INITIATE box, encrypted
+under the ephemeral session keys.
 
 The server verifies the vouch and checks `C` against its set of authorized
 client keys. The server MAY reject unknown clients with an ERROR command.
@@ -490,6 +490,7 @@ protected by the ephemeral key exchange.
 | Nonce misuse resistance | Nonces derived deterministically from DH and transcript; no randomness needed after ephemeral key generation |
 | Low-order point rejection | All DH outputs MUST be checked for all-zero value; abort on detection |
 | Frame flag integrity | Flags byte authenticated as AAD; prevents bit-flip attacks on frame type |
+| Cookie key rotation | Cookie key K rotated every 60s; limits forward secrecy exposure window |
 
 ### 13.1 What BLAKE3ZMQ Does NOT Protect
 

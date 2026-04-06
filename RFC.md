@@ -11,11 +11,13 @@
 
 BLAKE3ZMQ provides authenticated encryption and perfect forward secrecy for
 ZMQ connections using X25519 key exchange, ChaCha20-BLAKE3 AEAD, and BLAKE3
-key derivation. It targets ZMQ draft socket types (SERVER/CLIENT, RADIO/DISH,
-GATHER/SCATTER) which use single-frame messages exclusively.
+key derivation. It targets ZMQ single-frame socket types (SERVER/CLIENT,
+RADIO/DISH, GATHER/SCATTER).
 
 ## 2. Goals
 
+- Protection of client identity
+- Equal or better security properties than CurveZMQ
 - Perfect forward secrecy via ephemeral Diffie-Hellman
 - Replay immunity via ephemeral keys and transcript binding
 - Channel binding via BLAKE3 transcript hash (chaining key)
@@ -24,6 +26,7 @@ GATHER/SCATTER) which use single-frame messages exclusively.
 - 32 bytes overhead per message (one BLAKE3 authentication tag)
 - No negotiation, renegotiation, or re-keying
 - Stateless server until client authentication (cookie mechanism)
+- Good performance on any CPU
 
 ## 3. Non-Goals
 

@@ -1,5 +1,8 @@
 # BLAKE3ZMQ
 
+> **Warning:** This is experimental and the gem is not maintained by cryptographers.
+> It has not been independently audited. For production, use CurveZMQ instead.
+
 BLAKE3ZMQ is a security mechanism for [OMQ](https://github.com/paddor/omq)
 that replaces [CurveZMQ](https://rfc.zeromq.org/spec/26/) with modern
 primitives:

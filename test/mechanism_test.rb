@@ -33,7 +33,8 @@ module NuckleCrypto
 
     def diffie_hellman(peer_public_key)
       pk = case peer_public_key
-           when PublicKey then peer_public_key.to_s
+           when PublicKey
+             peer_public_key.to_s
            else peer_public_key.to_s.b
            end
       @key.diffie_hellman(pk)
@@ -185,14 +186,20 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
         # Wrap client_io to record writes (these are client->server frames)
         client_writes = []
         client_wrapper = Object.new
-        client_wrapper.define_singleton_method(:write) { |data| client_writes << data.b.dup; client_io.write(data) }
+        client_wrapper.define_singleton_method(:write) do |data|
+          client_writes << data.b.dup
+          client_io.write(data)
+        end
         client_wrapper.define_singleton_method(:flush) { client_io.flush }
         client_wrapper.define_singleton_method(:read_exactly) { |n| client_io.read_exactly(n) }
         client_wrapper.define_singleton_method(:close) { client_io.close }
 
         server_writes = []
         server_wrapper = Object.new
-        server_wrapper.define_singleton_method(:write) { |data| server_writes << data.b.dup; server_io.write(data) }
+        server_wrapper.define_singleton_method(:write) do |data|
+          server_writes << data.b.dup
+          server_io.write(data)
+        end
         server_wrapper.define_singleton_method(:flush) { server_io.flush }
         server_wrapper.define_singleton_method(:read_exactly) { |n| server_io.read_exactly(n) }
         server_wrapper.define_singleton_method(:close) { server_io.close }
@@ -283,7 +290,8 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
         assert hello_body.bytesize >= welcome_body.bytesize,
                "HELLO (#{hello_body.bytesize}) must be >= WELCOME (#{welcome_body.bytesize})"
       ensure
-        s1&.close; s2&.close
+        s1&.close
+        s2&.close
       end
     end
   end
@@ -756,7 +764,10 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     Async do
       server, client, sio, cio = make_pair
 
-      [Async { server.handshake! }, Async { client.handshake! }].each(&:wait)
+      Barrier do |bar|
+        bar.async { server.handshake! }
+        bar.async { client.handshake! }
+      end
 
       large_msg = SecureRandom.random_bytes(1_000_000)
       Async { client.send_message([large_msg]) }
@@ -764,7 +775,8 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
       Async { msg = server.receive_message }.wait
       assert_equal [large_msg], msg
     ensure
-      sio&.close; cio&.close
+      sio&.close
+      cio&.close
     end
   end
 
@@ -772,14 +784,18 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     Async do
       server, client, sio, cio = make_pair
 
-      [Async { server.handshake! }, Async { client.handshake! }].each(&:wait)
+      Barrier do |bar|
+        bar.async { server.handshake! }
+        bar.async { client.handshake! }
+      end
 
       Async { client.send_message([""]) }
       msg = nil
       Async { msg = server.receive_message }.wait
       assert_equal [""], msg
     ensure
-      sio&.close; cio&.close
+      sio&.close
+      cio&.close
     end
   end
 
@@ -801,7 +817,10 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
       server_mech = Blake3Mech.server(
         public_key: server_pub, secret_key: server_sec,
         crypto: NuckleCrypto,
-        authenticator: ->(peer) { received_peer = peer; true },
+        authenticator: lambda { |peer|
+          received_peer = peer
+          true
+        },
       )
       client_mech = Blake3Mech.client(
         server_key: server_pub, crypto: NuckleCrypto,

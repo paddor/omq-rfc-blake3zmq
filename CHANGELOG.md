@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Replace `[Async {}].each(&:wait)` with `Barrier` in tests.
+- YARD documentation on all public methods and classes.
+- Code style: expand `else X` one-liners, two blank lines between methods
+  and constants.
+
 - **Breaking:** API is now kwargs-only:
   `Blake3.server(public_key:, secret_key:)` and
   `Blake3.client(server_key:)`. Client keys are optional — when omitted,

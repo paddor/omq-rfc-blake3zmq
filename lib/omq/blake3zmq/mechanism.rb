@@ -36,6 +36,7 @@ module Protocol
         KEY_SIZE       = 32
         NONCE_SIZE     = 24
 
+
         # Creates a BLAKE3 server mechanism.
         #
         # @param public_key [String] 32 bytes
@@ -49,6 +50,7 @@ module Protocol
           new(public_key:, secret_key:, crypto:, as_server: true, authenticator:)
         end
 
+
         # Creates a BLAKE3 client mechanism.
         #
         # @param server_key [String] 32 bytes (server permanent public key)
@@ -60,6 +62,15 @@ module Protocol
           new(public_key:, secret_key:, server_key:, crypto:, as_server: false)
         end
 
+
+        # Initializes a new BLAKE3 mechanism instance.
+        #
+        # @param public_key [String, nil] 32-byte permanent public key
+        # @param secret_key [String, nil] 32-byte permanent secret key
+        # @param server_key [String, nil] 32-byte server permanent public key (client only)
+        # @param crypto [Module] crypto backend module
+        # @param as_server [Boolean] whether this instance acts as a server
+        # @param authenticator [#call, nil] optional authenticator for server mode
         def initialize(public_key: nil, secret_key: nil, server_key: nil, crypto: OMQ::Blake3ZMQ::Crypto, as_server: false, authenticator: nil)
           @crypto        = crypto
           @as_server     = as_server
@@ -89,19 +100,42 @@ module Protocol
           @recv_stream = nil
         end
 
+
+        # Resets stream state when duplicating the mechanism.
+        #
+        # @param source [Blake3] the original mechanism being duplicated
         def initialize_dup(source)
           super
           @send_stream = nil
           @recv_stream = nil
         end
 
+
+        # Whether this mechanism encrypts traffic.
+        #
+        # @return [Boolean] always true
         def encrypted? = true
 
+        # Returns a maintenance task that rotates the server cookie key.
+        #
+        # @return [Hash, nil] a hash with +:interval+ (seconds) and +:task+ (Proc), or nil for clients
         def maintenance
           return unless @as_server
           { interval: 60, task: -> { @cookie_key = @crypto.random_bytes(KEY_SIZE) } }.freeze
         end
 
+
+        # Performs the BLAKE3ZMQ handshake over the given IO.
+        #
+        # Delegates to the client or server handshake depending on role.
+        #
+        # @param io [#write, #read_exactly] transport IO
+        # @param as_server [Boolean] ignored (role is set at construction)
+        # @param socket_type [String] ZMTP socket type name
+        # @param identity [String] socket identity
+        # @param qos [Integer] QoS level
+        # @param qos_hash [String] QoS hash algorithm preference string
+        # @return [Hash] peer metadata including +:peer_socket_type+, +:peer_identity+, +:peer_qos+, +:peer_qos_hash+
         def handshake!(io, as_server:, socket_type:, identity:, qos: 0, qos_hash: "")
           if @as_server
             server_handshake!(io, socket_type:, identity:, qos:, qos_hash:)
@@ -110,6 +144,13 @@ module Protocol
           end
         end
 
+
+        # Encrypts a ZMTP frame body for transmission.
+        #
+        # @param body [String] plaintext frame body
+        # @param more [Boolean] whether the MORE flag is set
+        # @param command [Boolean] whether this is a command frame
+        # @return [String] wire-encoded encrypted frame (header + ciphertext)
         def encrypt(body, more: false, command: false)
           flags = 0
           flags |= 0x01 if more
@@ -128,6 +169,12 @@ module Protocol
           wire << ct
         end
 
+
+        # Decrypts an encrypted ZMTP frame.
+        #
+        # @param frame [Codec::Frame] encrypted frame with body, more?, and command? attributes
+        # @return [Codec::Frame] decrypted frame
+        # @raise [Error] if decryption fails
         def decrypt(frame)
           flags = 0
           flags |= 0x01 if frame.more?
@@ -161,6 +208,7 @@ module Protocol
           unless peer_greeting[:mechanism] == MECHANISM_NAME
             raise Error, "expected #{MECHANISM_NAME} mechanism, got #{peer_greeting[:mechanism]}"
           end
+
 
           # h0 = H("BLAKE3ZMQ-1.0" || client_greeting || server_greeting)
           h = hash(PROTOCOL_ID + our_greeting + peer_greeting_bytes)
@@ -285,6 +333,7 @@ module Protocol
           { peer_socket_type:, peer_identity:, peer_qos:, peer_qos_hash: }
         end
 
+
         # ----------------------------------------------------------------
         # Server-side handshake
         # ----------------------------------------------------------------
@@ -299,6 +348,7 @@ module Protocol
           unless peer_greeting[:mechanism] == MECHANISM_NAME
             raise Error, "expected #{MECHANISM_NAME} mechanism, got #{peer_greeting[:mechanism]}"
           end
+
 
           # h0 = H("BLAKE3ZMQ-1.0" || client_greeting || server_greeting)
           # Note: peer is the client here
@@ -328,6 +378,7 @@ module Protocol
           rescue @crypto::CryptoError
             raise Error, "HELLO decryption failed"
           end
+
 
           # h1 = H(h0 || HELLO_wire_bytes)
           h = hash(h + hello_frame.to_wire)
@@ -406,6 +457,7 @@ module Protocol
             raise Error, "INITIATE decryption failed"
           end
 
+
           # Always parse C(32) + vouch_box(96) + metadata
           raise Error, "INITIATE plaintext too short" if initiate_plain.bytesize < KEY_SIZE + 96
 
@@ -442,6 +494,7 @@ module Protocol
               raise Error, "client key not authorized"
             end
           end
+
 
           # h3 = H(h2 || INITIATE_wire_bytes)
           h = hash(h + init_frame.to_wire)
@@ -481,6 +534,7 @@ module Protocol
           }
         end
 
+
         # ----------------------------------------------------------------
         # Session key derivation
         # ----------------------------------------------------------------
@@ -502,6 +556,7 @@ module Protocol
           end
         end
 
+
         # ----------------------------------------------------------------
         # Crypto helpers
         # ----------------------------------------------------------------
@@ -510,13 +565,16 @@ module Protocol
           @crypto::Hash.digest(input)
         end
 
+
         def kdf(context, material)
           @crypto::Hash.derive_key(context, material)
         end
 
+
         def kdf24(context, material)
           @crypto::Hash.derive_key(context, material, size: NONCE_SIZE)
         end
+
 
         def send_error(io, reason)
           error_body = "".b
@@ -528,12 +586,15 @@ module Protocol
           # connection may already be broken
         end
 
+
         def validate_key!(key, name)
           raise ArgumentError, "#{name} is required" if key.nil?
           raise ArgumentError, "#{name} must be 32 bytes (got #{key.b.bytesize})" unless key.b.bytesize == KEY_SIZE
         end
 
+
         ZERO_DH = ("\x00" * KEY_SIZE).b.freeze
+
 
         def validate_dh!(shared_secret, label)
           raise Error, "#{label} produced all-zero output (low-order point)" if shared_secret == ZERO_DH

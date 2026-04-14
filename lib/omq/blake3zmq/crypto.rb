@@ -7,6 +7,7 @@ require "securerandom"
 
 module OMQ
   module Blake3ZMQ
+
     # Default crypto backend: x25519 (native C) + chacha20blake3 (Rust native).
     module Crypto
       CryptoError = ChaCha20Blake3::DecryptionError
@@ -14,22 +15,25 @@ module OMQ
       Cipher      = ChaCha20Blake3::Cipher
       Stream      = ChaCha20Blake3::Stream
 
+
       # X25519 public key wrapper.
       class PublicKey
+        attr_reader :key
+
+
         # @param bytes [String] 32-byte public key
         def initialize(bytes)
           bytes = bytes.to_s if bytes.respond_to?(:to_bytes)
-          @key = X25519::MontgomeryU.new(bytes.b)
+          @key  = X25519::MontgomeryU.new(bytes.b)
         end
 
 
         # Returns the raw 32-byte public key.
         #
         # @return [String] 32-byte binary string
-        def to_s = @key.to_bytes
-
-        # @api private
-        attr_reader :key
+        def to_s
+          @key.to_bytes
+        end
       end
 
 
@@ -38,7 +42,10 @@ module OMQ
         # Generates a new random private key.
         #
         # @return [PrivateKey]
-        def self.generate = new(X25519::Scalar.generate.to_bytes)
+        def self.generate
+          new(X25519::Scalar.generate.to_bytes)
+        end
+
 
         # @param bytes [String] 32-byte secret key
         def initialize(bytes)
@@ -49,12 +56,18 @@ module OMQ
         # Returns the corresponding public key.
         #
         # @return [PublicKey]
-        def public_key = PublicKey.new(@key.public_key.to_bytes)
+        def public_key
+          PublicKey.new(@key.public_key.to_bytes)
+        end
+
 
         # Returns the raw 32-byte secret key.
         #
         # @return [String] 32-byte binary string
-        def to_s = @key.to_bytes
+        def to_s
+          @key.to_bytes
+        end
+
 
         # Performs X25519 Diffie-Hellman with a peer's public key.
         #
@@ -67,6 +80,7 @@ module OMQ
                else
                  X25519::MontgomeryU.new(peer_public_key.to_s.b)
                end
+
           @key.diffie_hellman(pk).to_bytes
         end
       end
@@ -96,7 +110,9 @@ module OMQ
         end
       end
 
+
       module_function
+
 
       # Generates cryptographically secure random bytes.
       #

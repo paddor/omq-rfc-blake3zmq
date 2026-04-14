@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 — 2026-04-15
 
 - Test suite updated for omq 0.20 socket API (`linger` setter, positional
   endpoint arg, `SUB#subscribe` replacing `subscribe:` on `#connect`).

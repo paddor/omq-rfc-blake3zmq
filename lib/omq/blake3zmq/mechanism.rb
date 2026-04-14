@@ -79,15 +79,19 @@ module Protocol
           if as_server
             validate_key!(public_key, "public_key")
             validate_key!(secret_key, "secret_key")
+
             @permanent_public = crypto::PublicKey.new(public_key.b)
             @permanent_secret = crypto::PrivateKey.new(secret_key.b)
-            @cookie_key = crypto.random_bytes(KEY_SIZE)
+            @cookie_key       = crypto.random_bytes(KEY_SIZE)
           else
             validate_key!(server_key, "server_key")
+
             @server_public = crypto::PublicKey.new(server_key.b)
+
             if public_key && secret_key
               validate_key!(public_key, "public_key")
               validate_key!(secret_key, "secret_key")
+
               @permanent_public = crypto::PublicKey.new(public_key.b)
               @permanent_secret = crypto::PrivateKey.new(secret_key.b)
             else
@@ -114,14 +118,21 @@ module Protocol
         # Whether this mechanism encrypts traffic.
         #
         # @return [Boolean] always true
-        def encrypted? = true
+        def encrypted?
+          true
+        end
+
 
         # Returns a maintenance task that rotates the server cookie key.
         #
         # @return [Hash, nil] a hash with +:interval+ (seconds) and +:task+ (Proc), or nil for clients
         def maintenance
           return unless @as_server
-          { interval: 60, task: -> { @cookie_key = @crypto.random_bytes(KEY_SIZE) } }.freeze
+
+          {
+            interval: 60,
+            task:     -> { @cookie_key = @crypto.random_bytes(KEY_SIZE) }
+          }.freeze
         end
 
 
@@ -152,13 +163,13 @@ module Protocol
         # @param command [Boolean] whether this is a command frame
         # @return [String] wire-encoded encrypted frame (header + ciphertext)
         def encrypt(body, more: false, command: false)
-          flags = 0
+          flags  = 0
           flags |= 0x01 if more
           flags |= 0x04 if command
 
-          ct = @send_stream.encrypt(body, aad: flags.chr)
-
+          ct         = @send_stream.encrypt(body, aad: flags.chr)
           frame_size = ct.bytesize
+
           if frame_size > 255
             wire = String.new(encoding: Encoding::BINARY, capacity: 9 + frame_size)
             wire << (flags | 0x02).chr << [frame_size].pack("Q>")
@@ -166,6 +177,7 @@ module Protocol
             wire = String.new(encoding: Encoding::BINARY, capacity: 2 + frame_size)
             wire << flags.chr << frame_size.chr
           end
+
           wire << ct
         end
 
@@ -176,7 +188,7 @@ module Protocol
         # @return [Codec::Frame] decrypted frame
         # @raise [Error] if decryption fails
         def decrypt(frame)
-          flags = 0
+          flags  = 0
           flags |= 0x01 if frame.more?
           flags |= 0x04 if frame.command?
 
@@ -185,10 +197,13 @@ module Protocol
           rescue @crypto::CryptoError
             raise Error, "decryption failed"
           end
+
           Codec::Frame.new(pt, more: frame.more?, command: frame.command?)
         end
 
+
         private
+
 
         # ----------------------------------------------------------------
         # Client-side handshake
@@ -205,6 +220,7 @@ module Protocol
           io.flush
           peer_greeting_bytes = io.read_exactly(Codec::Greeting::SIZE)
           peer_greeting = Codec::Greeting.decode(peer_greeting_bytes)
+
           unless peer_greeting[:mechanism] == MECHANISM_NAME
             raise Error, "expected #{MECHANISM_NAME} mechanism, got #{peer_greeting[:mechanism]}"
           end
@@ -330,7 +346,12 @@ module Protocol
           # Derive session keys
           derive_session_keys!(h, dh2, as_client: true)
 
-          { peer_socket_type:, peer_identity:, peer_qos:, peer_qos_hash: }
+          {
+            peer_socket_type:,
+            peer_identity:,
+            peer_qos:,
+            peer_qos_hash:
+          }
         end
 
 
@@ -588,8 +609,13 @@ module Protocol
 
 
         def validate_key!(key, name)
-          raise ArgumentError, "#{name} is required" if key.nil?
-          raise ArgumentError, "#{name} must be 32 bytes (got #{key.b.bytesize})" unless key.b.bytesize == KEY_SIZE
+          if key.nil?
+            raise ArgumentError, "#{name} is required"
+          end
+
+          unless key.b.bytesize == KEY_SIZE
+            raise ArgumentError, "#{name} must be 32 bytes (got #{key.b.bytesize})"
+          end
         end
 
 
@@ -597,8 +623,11 @@ module Protocol
 
 
         def validate_dh!(shared_secret, label)
-          raise Error, "#{label} produced all-zero output (low-order point)" if shared_secret == ZERO_DH
+          if shared_secret == ZERO_DH
+            raise Error, "#{label} produced all-zero output (low-order point)"
+          end
         end
+
       end
     end
   end

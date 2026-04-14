@@ -176,7 +176,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "verifies actual handshake frame sizes on the wire" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
 
@@ -299,7 +299,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
 
   describe "server-only auth (default)" do
     it "completes handshake and exchanges messages" do
-      Async do
+      Sync do
         server, client, sio, cio = make_pair(mutual_auth: false)
 
         Barrier do |bar|
@@ -330,7 +330,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "rejects client with wrong server key" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         wrong_pub, _ = generate_keypair
 
@@ -374,7 +374,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
 
   describe "mutual auth" do
     it "completes handshake and exchanges messages" do
-      Async do
+      Sync do
         server, client, sio, cio = make_pair(mutual_auth: true)
 
         Barrier do |bar|
@@ -405,7 +405,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "exchanges multiple messages in both directions" do
-      Async do
+      Sync do
         server, client, sio, cio = make_pair
 
         Barrier do |bar|
@@ -435,7 +435,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "rejects client with wrong server key" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
         wrong_pub, _ = generate_keypair
@@ -484,7 +484,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "passes a PeerInfo with the client's PublicKey to the authenticator" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
 
@@ -529,7 +529,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "accepts when authenticator (lambda) returns true" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
 
@@ -566,7 +566,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "rejects when authenticator (lambda) returns false" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
 
@@ -615,7 +615,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "accepts when key is in the allowed set" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
 
@@ -654,7 +654,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
     end
 
     it "rejects when key is not in the allowed set" do
-      Async do
+      Sync do
         server_pub, server_sec = generate_keypair
         client_pub, client_sec = generate_keypair
 
@@ -706,7 +706,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
   end
 
   it "uses the built-in crypto backend by default" do
-    Async do
+    Sync do
       server_pub, server_sec = generate_keypair
 
       s1, s2 = UNIXSocket.pair
@@ -762,7 +762,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
   end
 
   it "handles large messages" do
-    Async do
+    Sync do
       server, client, sio, cio = make_pair
 
       Barrier do |bar|
@@ -782,7 +782,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
   end
 
   it "handles empty messages" do
-    Async do
+    Sync do
       server, client, sio, cio = make_pair
 
       Barrier do |bar|
@@ -801,7 +801,7 @@ describe Protocol::ZMTP::Mechanism::Blake3 do
   end
 
   it "works with a custom crypto backend (Nuckle)" do
-    Async do
+    Sync do
       server_sk = NuckleCrypto::PrivateKey.generate
       server_pub = server_sk.public_key.to_s
       server_sec = server_sk.to_s

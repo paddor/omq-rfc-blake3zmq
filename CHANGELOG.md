@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Test suite updated for omq 0.20 socket API (`linger` setter, positional
+  endpoint arg, `SUB#subscribe` replacing `subscribe:` on `#connect`).
+  XPUB/XSUB integration test now uses `subscriber_joined.wait` after a
+  raw `\x01` data-frame subscription.
+
 ## 0.2.0 — 2026-04-07
 
 - Replace `[Async {}].each(&:wait)` with `Barrier` in tests.

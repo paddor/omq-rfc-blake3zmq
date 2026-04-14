@@ -34,7 +34,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
     it "works end-to-end" do
       server_pub, server_sec = generate_keypair
 
-      Async do
+      Sync do
         pull = OMQ::PULL.new
         pull.mechanism = blake3_server(server_pub, server_sec)
         pull.bind("tcp://127.0.0.1:0")
@@ -60,7 +60,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
     it "works end-to-end" do
       server_pub, server_sec = generate_keypair
 
-      Async do |task|
+      Sync do |task|
         rep = OMQ::REP.new
         rep.mechanism = blake3_server(server_pub, server_sec)
         rep.bind("tcp://127.0.0.1:0")
@@ -91,7 +91,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
       server_pub, server_sec = generate_keypair
       addr = "ipc://@omq-blake3-pubsub-#{$$}"
 
-      Async do |task|
+      Sync do |task|
         pub = OMQ::PUB.new
         pub.mechanism = blake3_server(server_pub, server_sec)
         pub.bind(addr)
@@ -116,7 +116,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
       server_pub, server_sec = generate_keypair
       addr = "ipc://@omq-blake3-pubsub-prefix-#{$$}"
 
-      Async do |task|
+      Sync do |task|
         pub = OMQ::PUB.new
         pub.mechanism = blake3_server(server_pub, server_sec)
         pub.bind(addr)
@@ -149,7 +149,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
     it "works end-to-end" do
       server_pub, server_sec = generate_keypair
 
-      Async do |task|
+      Sync do |task|
         xpub = OMQ::XPUB.new
         xpub.mechanism = blake3_server(server_pub, server_sec)
         xpub.bind("tcp://127.0.0.1:0")
@@ -158,10 +158,12 @@ describe "BLAKE3ZMQ integration (socket-level)" do
         xsub = OMQ::XSUB.new
         xsub.mechanism = blake3_client(server_key: server_pub)
         xsub.connect("tcp://127.0.0.1:#{port}")
-        xsub.subscribe("")
+        wait_connected(xsub)
+        xsub.send("\x01".b)
         xpub.subscriber_joined.wait
 
         task.async { xpub << "xpub news" }
+        xsub.read_timeout = 2
         msg = xsub.receive
         assert_equal ["xpub news"], msg
       ensure
@@ -176,7 +178,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
     it "supports multiple clients to one server" do
       server_pub, server_sec = generate_keypair
 
-      Async do |task|
+      Sync do |task|
         rep = OMQ::REP.new
         rep.mechanism = blake3_server(server_pub, server_sec)
         rep.bind("tcp://127.0.0.1:0")
@@ -215,7 +217,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
     it "encrypts and decrypts multipart correctly" do
       server_pub, server_sec = generate_keypair
 
-      Async do
+      Sync do
         pull = OMQ::PULL.new
         pull.mechanism = blake3_server(server_pub, server_sec)
         pull.bind("tcp://127.0.0.1:0")
@@ -226,7 +228,7 @@ describe "BLAKE3ZMQ integration (socket-level)" do
         push.connect("tcp://127.0.0.1:#{port}")
         wait_connected(push)
 
-        push.send_message(["frame1", "frame2", "frame3"])
+        push.send(["frame1", "frame2", "frame3"])
         msg = pull.receive
         assert_equal ["frame1", "frame2", "frame3"], msg
       ensure

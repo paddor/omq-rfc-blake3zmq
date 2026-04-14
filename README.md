@@ -53,20 +53,20 @@ client_sk = Crypto::PrivateKey.generate
 client_pk = client_sk.public_key.to_s
 
 # Server socket
-server = OMQ::Server.new
+server = OMQ::REP.new
 server.mechanism = Protocol::ZMTP::Mechanism::Blake3.server(
-  server_pk, server_sk.to_s,
-  crypto: Crypto,
+  public_key: server_pk,
+  secret_key: server_sk.to_s,
   authenticator: ->(peer) { peer.public_key.to_s == client_pk },
 )
 server.bind("tcp://127.0.0.1:9999")
 
-# Client socket
-client = OMQ::Client.new
+# Client socket (keys optional — omit for anonymous/ephemeral identity)
+client = OMQ::REQ.new
 client.mechanism = Protocol::ZMTP::Mechanism::Blake3.client(
-  client_pk, client_sk.to_s,
   server_key: server_pk,
-  crypto: Crypto,
+  public_key: client_pk,
+  secret_key: client_sk.to_s,
 )
 client.connect("tcp://127.0.0.1:9999")
 ```
